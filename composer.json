@@ -1,9 +1,4 @@
 {
-  "name": "drupal/mailgun",
-  "description": "Provides integration with the Mailgun PHP library.",
-  "type": "drupal-module",
-  "homepage": "https://www.drupal.org/project/mailgun",
-  "license": "GPL-2.0+",
   "require": {
     "mailgun/mailgun-php": "~3.0",
     "php-http/guzzle6-adapter": "~2.0",

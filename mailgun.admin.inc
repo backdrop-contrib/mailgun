@@ -262,7 +262,7 @@ function mailgun_test_form($form, &$form_state) {
   $form['attachment'] = array(
     '#title' => t('Include attachment'),
     '#type' => 'checkbox',
-    '#description' => t('If checked, the Backdrop icon will be included as an attachment with the test e-mail.'),
+    '#description' => t('If checked, a Backdrop image will be included as an attachment with the test e-mail.'),
     '#default_value' => TRUE,
   );
 

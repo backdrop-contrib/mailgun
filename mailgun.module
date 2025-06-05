@@ -111,7 +111,7 @@ function mailgun_mail($key, &$message, $params) {
       $message['subject'] = t('Mailgun test email');
       $message['body'] = $params['message'];
       if ($params['attachment']) {
-        $message['params']['attachments'] = array(backdrop_realpath('misc/druplicon.png'));
+        $message['params']['attachments'] = array(backdrop_realpath('core/themes/basis/images/drop-lounging.png'));
       }
       break;
   }
