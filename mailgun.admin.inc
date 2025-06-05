@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Administration page callbacks for Mailgun.
@@ -19,23 +18,21 @@
 function mailgun_admin_settings(array $form, array &$form_state) {
   // Check if the Mailgun PHP library is installed.
   if (!mailgun_check_library()) {
-    drupal_set_message(t('The Mailgun PHP library is not installed. Please see Installation section in the !link.', array(
-      '!link' => l(t('documentation'), MAILGUN_DOCUMENTATION_LINK),
+    backdrop_set_message(t('The Mailgun PHP library is not installed. Please see Installation section in the !link.', array(
+      '!link' => l(t('documentation'), 'https://github.com/backdrop-contrib/mailgun/wiki'),
     )), 'error');
   }
 
-  global $language;
+  $config = config('mailgun.settings');
+  $key = $config->get('api_key');
 
-  // Get title and description from mailgun_variable_info().
-  module_load_include('inc', 'mailgun', 'mailgun.variable');
-  $variables = module_invoke('mailgun', 'variable_info', array('language' => $language));
-
-  $key = variable_get(MAILGUN_API_KEY, '');
-
-  $form[MAILGUN_API_KEY] = array(
-    '#title' => $variables[MAILGUN_API_KEY]['title'],
+  $form['#config'] = 'mailgun.settings';
+  $form['api_key'] = array(
+    '#title' => t('Mailgun API key'),
     '#type' => 'textfield',
-    '#description' => $variables[MAILGUN_API_KEY]['description'],
+    '#description' => t('Get your Secret API key from the !link.', array(
+      '!link' => l(t('Mailgun dashboard'), 'https://app.mailgun.com/app/dashboard'),
+    )),
     '#default_value' => $key,
     '#required' => TRUE,
   );
@@ -43,15 +40,15 @@ function mailgun_admin_settings(array $form, array &$form_state) {
   $client = FALSE;
   if (!empty($key)) {
     try {
-      $endpoint = !empty($form_state['values'][MAILGUN_API_ENDPOINT]) ? $form_state['values'][MAILGUN_API_ENDPOINT] : '';
+      $endpoint = !empty($form_state['values']['api_endpoint']) ? $form_state['values']['api_endpoint'] : '';
       $client = mailgun_get_client($key, $endpoint);
     }
     catch (Exception $e) {
       watchdog('mailgun', 'An exception occurred. @code: @message', array(
         '@code' => $e->getCode(),
         '@message' => $e->getMessage(),
-      ), WATCHDOG_WARNING, MAILGUN_ADMIN_PAGE);
-      drupal_set_message(t('Mailgun: %message', array('%message' => $e->getMessage())), 'error');
+      ), WATCHDOG_WARNING, 'admin/config/services/mailgun');
+      backdrop_set_message(t('Mailgun: %message', array('%message' => $e->getMessage())), 'error');
     }
   }
 
@@ -73,48 +70,48 @@ function mailgun_admin_settings(array $form, array &$form_state) {
       $domain_options = array_merge($domain_options, $options);
     }
 
-    $form[MAILGUN_DOMAIN] = array(
-      '#title' => $variables[MAILGUN_DOMAIN]['title'],
+    $form['domain'] = array(
+      '#title' => t('Domain'),
       '#type' => 'select',
       '#options' => $domain_options,
-      '#description' => $variables[MAILGUN_DOMAIN]['description'],
-      '#default_value' => variable_get(MAILGUN_DOMAIN, '_sender'),
+      '#description' => t('Mails will be sent using this domain.'),
+      '#default_value' => $config->get('domain'),
       '#prefix' => '<div id="mailgun-domains-wrapper">',
       '#suffix' => '</div>',
     );
 
-    $form[MAILGUN_API_ENDPOINT] = array(
-      '#title' => $variables[MAILGUN_API_ENDPOINT]['title'],
+    $form['api_endpoint'] = array(
+      '#title' => t('Mailgun region'),
       '#type' => 'select',
       '#options' => [
         'https://api.mailgun.net' => t('Default (US)'),
         'https://api.eu.mailgun.net' => t('Europe'),
       ],
-      '#description' => $variables[MAILGUN_API_ENDPOINT]['description'],
-      '#default_value' => variable_get(MAILGUN_API_ENDPOINT, $variables[MAILGUN_API_ENDPOINT]['default']),
+      '#description' => t('Select which Mailgun region to use.'),
+      '#default_value' => $config->get('api_endpoint'),
       '#ajax' => [
         'wrapper' => 'mailgun-domains-wrapper',
         'callback' => 'mailgun_admin_domains_callback',
       ],
     );
 
-    $form[MAILGUN_TEST_MODE] = array(
-      '#title' => $variables[MAILGUN_TEST_MODE]['title'],
+    $form['test_mode'] = array(
+      '#title' => t('Test mode'),
       '#type' => 'checkbox',
-      '#default_value' => variable_get(MAILGUN_TEST_MODE, FALSE),
-      '#description' => $variables[MAILGUN_TEST_MODE]['description'],
+      '#description' => t('Mailgun will accept the message but will not send it. This is useful for testing purposes.'),
+      '#default_value' => $config->get('test_mode'),
     );
 
-    $form[MAILGUN_LOG_EMAILS] = array(
-      '#title' => $variables[MAILGUN_LOG_EMAILS]['title'],
+    $form['log_emails'] = array(
+      '#title' => t('Log mails'),
       '#type' => 'checkbox',
-      '#description' => $variables[MAILGUN_LOG_EMAILS]['description'],
-      '#default_value' => variable_get(MAILGUN_LOG_EMAILS, FALSE),
+      '#description' => t('Log all mails sent through Mailgun. Messages fail to send will be logged regardless of this setting.'),
+      '#default_value' => $config->get('log_emails'),
     );
 
     $form['extra'] = array(
-      '#type' => 'fieldset',
       '#title' => t('Additional settings'),
+      '#type' => 'fieldset',
       '#description' => t('These default settings apply to messages sent using Mailgun and may be overriden on a per-message basis.'),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
@@ -128,32 +125,34 @@ function mailgun_admin_settings(array $form, array &$form_state) {
     );
 
     $form['extra']['tracking'] = array(
-      '#type' => 'fieldset',
       '#title' => t('Tracking'),
+      '#type' => 'fieldset',
     );
 
-    $form['extra']['tracking'][MAILGUN_TRACKING] = array(
-      '#title' => $variables[MAILGUN_TRACKING]['title'],
+    $form['extra']['tracking']['tracking'] = array(
+      '#title' => t('Enable tracking'),
       '#type' => 'select',
       '#options' => $options,
-      '#description' => $variables[MAILGUN_TRACKING]['description'],
-      '#default_value' => variable_get(MAILGUN_TRACKING, 'default'),
+      '#description' => t('Whether to enable event tracking by default or not. See !link for details.', array(
+        '!link' => l(t('Tracking Messages'), 'https://documentation.mailgun.com/user_manual.html#tracking-messages'),
+      )),
+      '#default_value' => $config->get('tracking'),
     );
 
-    $form['extra']['tracking'][MAILGUN_TRACKING_CLICKS] = array(
-      '#title' => $variables[MAILGUN_TRACKING_CLICKS]['title'],
+    $form['extra']['tracking']['tracking_clicks'] = array(
+      '#title' => t('Enable click tracking'),
       '#type' => 'select',
       '#options' => $options,
-      '#description' => $variables[MAILGUN_TRACKING_CLICKS]['description'],
-      '#default_value' => variable_get(MAILGUN_TRACKING_CLICKS, 'default'),
+      '#description' => t('Whether to enable click tracking by default or not.'),
+      '#default_value' => $config->get('tracking_clicks'),
     );
 
-    $form['extra']['tracking'][MAILGUN_TRACKING_OPENS] = array(
-      '#title' => $variables[MAILGUN_TRACKING_OPENS]['title'],
+    $form['extra']['tracking']['tracking_opens'] = array(
+      '#title' => t('Enable open tracking'),
       '#type' => 'select',
       '#options' => $options,
-      '#description' => $variables[MAILGUN_TRACKING_OPENS]['description'],
-      '#default_value' => variable_get(MAILGUN_TRACKING_OPENS, 'default'),
+      '#description' => t('Whether to enable open tracking by default or not.'),
+      '#default_value' => $config->get('tracking_opens'),
     );
 
     $formats = array('_none' => t('- None -'));
@@ -163,26 +162,32 @@ function mailgun_admin_settings(array $form, array &$form_state) {
       }
       $formats[$format->format] = $format->name;
     }
-    $form['extra'][MAILGUN_FORMAT] = array(
-      '#title' => $variables[MAILGUN_FORMAT]['title'],
+    $form['extra']['format'] = array(
+      '#title' => t('Text format'),
       '#type' => 'select',
-      '#description' => $variables[MAILGUN_FORMAT]['description'],
+      '#description' => t('Specify an additional text format to filter the message through before sending the email.'),
       '#options' => $formats,
-      '#default_value' => variable_get(MAILGUN_FORMAT, '_none'),
+      '#default_value' => $config->get('format'),
     );
 
-    $form['extra'][MAILGUN_QUEUE] = array(
-      '#title' => $variables[MAILGUN_QUEUE]['title'],
+    $form['extra']['queue'] = array(
+      '#title' => t('Queue mails'),
       '#type' => 'checkbox',
-      '#description' => $variables[MAILGUN_QUEUE]['description'],
-      '#default_value' => variable_get(MAILGUN_QUEUE, FALSE),
+      '#description' => t('Mails will be queued and sent during cron runs. Useful for sending a large number of emails.'),
+      '#default_value' => $config->get('queue'),
     );
 
-    $form['extra'][MAILGUN_TAGGING_MAILKEY] = array(
+    $form['extra']['tagging_mailkey'] = array(
+      '#title' => t('Enable tags by mail key'),
       '#type' => 'checkbox',
-      '#title' => $variables[MAILGUN_TAGGING_MAILKEY]['title'],
-      '#description' => $variables[MAILGUN_TAGGING_MAILKEY]['description'],
-      '#default_value' => variable_get(MAILGUN_TAGGING_MAILKEY, TRUE),
+      '#description' => t('See !url for details.', array(
+        '!url' => l(t('Tagging'), 'https://documentation.mailgun.com/user_manual.html#tagging', array(
+          'attributes' => array(
+            'onclick' => "target='_blank'",
+          ),
+        )),
+      )),
+      '#default_value' => $config->get('tagging_mailkey'),
     );
   }
 
@@ -196,7 +201,7 @@ function mailgun_admin_settings(array $form, array &$form_state) {
  * AJAX callback for domains list.
  */
 function mailgun_admin_domains_callback($form, $form_state) {
-  return $form[MAILGUN_DOMAIN];
+  return $form['domain'];
 }
 
 /**
@@ -205,22 +210,22 @@ function mailgun_admin_domains_callback($form, $form_state) {
  * Perform additional validation to ensure the API key entered is valid.
  */
 function mailgun_admin_settings_validate($form, &$form_state) {
-  if ($form[MAILGUN_API_KEY]['#default_value'] != $form_state['values'][MAILGUN_API_KEY]) {
+  if ($form['api_key']['#default_value'] != $form_state['values']['api_key']) {
     // The API key has changed. Perform validation.
-    $form_state['values'][MAILGUN_API_KEY] = trim($form_state['values'][MAILGUN_API_KEY]);
-    $client = mailgun_get_client($form_state['values'][MAILGUN_API_KEY]);
+    $form_state['values']['api_key'] = trim($form_state['values']['api_key']);
+    $client = mailgun_get_client($form_state['values']['api_key']);
 
     if ($client === FALSE) {
-      drupal_set_message(t('Could not connect to Mailgun API. Please check your settings'), 'warning');
+      backdrop_set_message(t('Could not connect to Mailgun API. Please check your settings'), 'warning');
       return;
     }
 
     try {
       $client->domains()->index();
-      drupal_set_message(t('Your API key has been successfully validated.'));
+      backdrop_set_message(t('Your API key has been successfully validated.'));
     }
     catch (Exception $e) {
-      form_set_error(MAILGUN_API_KEY, t('An exception occurred. @code: @message', array(
+      form_set_error('api_key', t('An exception occurred. @code: @message', array(
         '@code' => $e->getCode(),
         '@message' => $e->getMessage(),
       )));
@@ -232,20 +237,20 @@ function mailgun_admin_settings_validate($form, &$form_state) {
  * Form builder. Display a form for sending a test e-mail.
  */
 function mailgun_test_form($form, &$form_state) {
-  drupal_set_title(t('Send test mail'));
+  backdrop_set_title(t('Send test mail'));
 
   $form['to'] = array(
-    '#type' => 'textfield',
+    '#type' => 'email',
     '#title' => t('To'),
-    '#default_value' => variable_get('site_mail', ''),
+    '#default_value' => config_get('system.core', 'site_mail'),
     '#description' => t('Type in an address to have the test email sent there.'),
     '#required' => TRUE,
   );
 
   $message = "Howdy!\n\nIf this e-mail is displayed correctly and delivered sound and safe, congrats! You have successfully configured Mailgun. ";
   $message .= t('Visit the !project to contribute or read !documentation to learn more.', array(
-    '!project' => l(t('project page'), 'https://www.drupal.org/project/mailgun'),
-    '!documentation' => l(t('documentation'), MAILGUN_DOCUMENTATION_LINK),
+    '!project' => l(t('project page'), 'https://www.backdropcms.org/project/mailgun'),
+    '!documentation' => l(t('documentation'), 'https://github.com/backdrop-contrib/mailgun/wiki'),
   ));
   $form['message'] = array(
     '#type' => 'textarea',
@@ -257,7 +262,7 @@ function mailgun_test_form($form, &$form_state) {
   $form['attachment'] = array(
     '#title' => t('Include attachment'),
     '#type' => 'checkbox',
-    '#description' => t('If checked, the Drupal icon will be included as an attachment with the test e-mail.'),
+    '#description' => t('If checked, the Backdrop icon will be included as an attachment with the test e-mail.'),
     '#default_value' => TRUE,
   );
 
@@ -267,7 +272,7 @@ function mailgun_test_form($form, &$form_state) {
   );
   $form['cancel'] = array(
     '#type' => 'link',
-    '#href' => MAILGUN_ADMIN_PAGE,
+    '#href' => 'admin/config/services/mailgun',
     '#title' => t('Cancel'),
   );
 
@@ -287,12 +292,13 @@ function mailgun_test_form_submit($form, &$form_state) {
     'message' => $body,
     'attachment' => $form_state['values']['attachment'],
   );
-  $site_name = variable_get('site_name', '');
-  $default_from = variable_get('site_mail', ini_get('sendmail_from'));
+  $core_config = config('system.core');
+  $site_name = $core_config->get('site_name');
+  $default_from = $core_config->get('site_mail');
   $from = (!empty($site_name)) ? $site_name . ' <' . $default_from . '>' : $default_from;
-  $result = drupal_mail('mailgun', 'test', $to, $GLOBALS['language'], $params, $from);
+  $result = backdrop_mail('mailgun', 'test', $to, $GLOBALS['language'], $params, $from);
 
-  drupal_set_message(t('Test email sent from %from to %to. If you have the "Log mails" setting enabled, check the <a href="@url">database log</a> for details.',
+  backdrop_set_message(t('Test email sent from %from to %to. If you have the "Log mails" setting enabled, check the <a href="@url">database log</a> for details.',
     array(
       '%from' => $result['from'],
       '%to' => $result['to'],

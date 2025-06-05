@@ -1,29 +1,8 @@
 <?php
-
 /**
  * @file
  * Install, update and uninstall functions for the Mailgun module.
  */
-
-/**
- * Implements hook_uninstall().
- */
-function mailgun_uninstall() {
-  global $language;
-
-  // We need to load our module to make possible use constants.
-  // See hook_uninstall() for details.
-  drupal_load('module', 'mailgun');
-
-  // Get title and description from mailgun_variable_info().
-  module_load_include('inc', 'mailgun', 'mailgun.variable');
-  $variables = module_invoke('mailgun', 'variable_info', array('language' => $language));
-
-  // Delete variables.
-  foreach ($variables as $variable => $data) {
-    variable_del($variable);
-  }
-}
 
 /**
  * Implements hook_enable().
@@ -61,7 +40,7 @@ function mailgun_requirements($phase) {
   else {
     if (mailgun_check_api_settings() === FALSE) {
       $requirements['mailgun']['value'] = $t('The Mailgun library is installed but API settings are not configured. Please check your !link.', [
-        '!link' => l($t('settings'), MAILGUN_ADMIN_PAGE),
+        '!link' => l($t('settings'), 'admin/config/services/mailgun'),
       ]);
       $requirements['mailgun']['severity'] = REQUIREMENT_WARNING;
     }
@@ -72,4 +51,38 @@ function mailgun_requirements($phase) {
   }
 
   return $requirements;
+}
+
+/**
+ * Convert variables to configuration.
+ */
+function mailgun_update_1000() {
+  $config = config('mailgun.settings');
+  $config->set('api_key', update_variable_get('mailgun_api_key', ''))
+    ->set('domain', update_variable_get('mailgun_domain', '_sender'))
+    ->set('api_endpoint', update_variable_get('mailgun_api_endpoint', 'https://api.mailgun.net'))
+    ->set('test_mode', update_variable_get('mailgun_test', FALSE))
+    ->set('log_emails', update_variable_get('mailgun_log', FALSE))
+    ->set('tracking', update_variable_get('mailgun_tracking', 'default'))
+    ->set('tracking_clicks', update_variable_get('mailgun_tracking_clicks', 'default'))
+    ->set('tracking_opens', update_variable_get('mailgun_tracking_opens', 'default'))
+    ->set('format', update_variable_get('mailgun_format', '_none'))
+    ->set('queue', update_variable_get('mailgun_queue', FALSE))
+    ->set('queue_threshold', update_variable_get('mailgun_queue_threshold', 0))
+    ->set('tagging_mailkey', update_variable_get('mailgun_tagging_mailkey', TRUE));
+  $config->save();
+
+  // Delete variables.
+  update_variable_del('mailgun_api_key');
+  update_variable_del('mailgun_domain');
+  update_variable_del('mailgun_api_endpoint');
+  update_variable_del('mailgun_test');
+  update_variable_del('mailgun_log');
+  update_variable_del('mailgun_tracking');
+  update_variable_del('mailgun_tracking_clicks');
+  update_variable_del('mailgun_tracking_opens');
+  update_variable_del('mailgun_format');
+  update_variable_del('mailgun_queue');
+  update_variable_del('mailgun_queue_threshold');
+  update_variable_del('mailgun_tagging_mailkey');
 }

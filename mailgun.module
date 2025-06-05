@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Provides integration with Mailgun's email sending API.
@@ -7,22 +6,25 @@
 
 use Mailgun\Mailgun;
 
-define('MAILGUN_DOCUMENTATION_LINK', 'https://www.drupal.org/node/2547591');
-define('MAILGUN_DASHBOARD_LINK', 'https://app.mailgun.com/app/dashboard');
-define('MAILGUN_ADMIN_PAGE', 'admin/config/services/mailgun');
+/**
+ * Implements hook_autoload_info().
+ */
+function mailgun_autoload_info() {
+  return array(
+    'MailgunMailSystem' => 'includes/mailgun_mail_system.class.inc',
+  );
+}
 
-define('MAILGUN_API_KEY', 'mailgun_api_key');
-define('MAILGUN_DOMAIN', 'mailgun_domain');
-define('MAILGUN_API_ENDPOINT', 'mailgun_api_endpoint');
-define('MAILGUN_TEST_MODE', 'mailgun_test');
-define('MAILGUN_LOG_EMAILS', 'mailgun_log');
-define('MAILGUN_TRACKING', 'mailgun_tracking');
-define('MAILGUN_TRACKING_CLICKS', 'mailgun_tracking_clicks');
-define('MAILGUN_TRACKING_OPENS', 'mailgun_tracking_opens');
-define('MAILGUN_FORMAT', 'mailgun_format');
-define('MAILGUN_QUEUE', 'mailgun_queue');
-define('MAILGUN_QUEUE_THRESHOLD', 'mailgun_queue_threshold');
-define('MAILGUN_TAGGING_MAILKEY', 'mailgun_tagging_mailkey');
+/**
+ * Implements hook_config_info().
+ */
+function mailgun_config_info() {
+  $prefixes['mailgun.settings'] = array(
+    'label' => t('Mailgun settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
 
 /**
  * Implements hook_menu().
@@ -30,22 +32,22 @@ define('MAILGUN_TAGGING_MAILKEY', 'mailgun_tagging_mailkey');
 function mailgun_menu() {
   $items = array();
 
-  $items[MAILGUN_ADMIN_PAGE] = array(
+  $items['admin/config/services/mailgun'] = array(
     'title' => 'Mailgun',
     'description' => 'Configure Mailgun settings.',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('mailgun_admin_settings'),
     'access arguments' => array('administer mailgun'),
     'file' => 'mailgun.admin.inc',
   );
-  $items[MAILGUN_ADMIN_PAGE . '/settings'] = array(
+  $items['admin/config/services/mailgun/settings'] = array(
     'title' => 'Settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => 0,
   );
-  $items[MAILGUN_ADMIN_PAGE . '/test'] = array(
+  $items['admin/config/services/mailgun/test'] = array(
     'title' => 'Send test email',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('mailgun_test_form'),
     'access arguments' => array('administer mailgun'),
     'description' => 'Send a test e-mail using the Mailgun API.',
@@ -82,25 +84,10 @@ function mailgun_theme($existing, $type, $theme, $path) {
         'message' => array(),
       ),
       'template' => 'mailgun-message',
-      'path' => drupal_get_path('module', 'mailgun') . '/templates',
+      'path' => backdrop_get_path('module', 'mailgun') . '/templates',
       'mail theme' => TRUE,
     ),
   );
-}
-
-/**
- * Implements hook_help().
- */
-function mailgun_help($path, $arg) {
-  switch ($path) {
-    case MAILGUN_ADMIN_PAGE:
-      return '<p>' . t('See !link for instructions on installing and configuring Mailgun.', array(
-        '!link' => l(t('documentation'), MAILGUN_DOCUMENTATION_LINK),
-      )) . '</p>';
-
-    case MAILGUN_ADMIN_PAGE . '/test':
-      return '<p>' . t('Use this form to send a test e-mail to ensure you have correctly configured Mailgun.') . '</p>';
-  }
 }
 
 /**
@@ -124,54 +111,10 @@ function mailgun_mail($key, &$message, $params) {
       $message['subject'] = t('Mailgun test email');
       $message['body'] = $params['message'];
       if ($params['attachment']) {
-        $message['params']['attachments'] = array(drupal_realpath('misc/druplicon.png'));
+        $message['params']['attachments'] = array(backdrop_realpath('misc/druplicon.png'));
       }
       break;
   }
-}
-
-/**
- * Implements hook_libraries_info().
- */
-function mailgun_libraries_info() {
-  $libraries['mailgun'] = array(
-    'name' => 'Mailgun PHP library',
-
-    'vendor url' => 'https://documentation.mailgun.com/en/latest/libraries.html#php',
-    'download url' => 'https://github.com/mailgun/mailgun-php',
-
-    'version arguments' => array(
-      'file' => 'vendor/mailgun/mailgun-php/CHANGELOG.md',
-      'pattern' => '/##\W+((\d+)\.(\d+))/',
-    ),
-
-    // Path to the 'autoload.php' created by Composer.
-    'path' => 'vendor',
-    'files' => array(
-      'php' => array('autoload.php'),
-    ),
-  );
-
-  return $libraries;
-}
-
-/**
- * Implements hook_form_FORM_ID_alter().
- */
-function mailgun_form_libraries_admin_library_status_form_alter(&$form, &$form_state, $form_id) {
-  $library = drupal_array_get_nested_value($form_state, array(
-    'build_info', 'args', 0,
-  ));
-  if (empty($library['machine name']) || $library['machine name'] !== 'mailgun') {
-    return;
-  }
-  // Libraries module provides own instruction "How to install the library".
-  // We override it because this instruction is not correct and may confuse.
-  $form['instructions'] = array(
-    '#markup' => t('The Mailgun PHP library is not installed. Please see Installation section in the !link.', array(
-      '!link' => l(t('documentation'), MAILGUN_DOCUMENTATION_LINK),
-    )),
-  );
 }
 
 /**
@@ -190,13 +133,18 @@ function mailgun_get_client($key = '', $endpoint = '') {
     return FALSE;
   }
 
-  $key = (empty($key)) ? variable_get('mailgun_api_key', '') : $key;
+  $key = (empty($key)) ? config_get('mailgun.settings', 'api_key') : $key;
   if (empty($key)) {
     watchdog('mailgun', 'Mailgun client initialization failed: Missing API key.', array(), WATCHDOG_ERROR);
     return FALSE;
   }
 
-  $endpoint = empty($endpoint) ? variable_get(MAILGUN_API_ENDPOINT, 'https://api.mailgun.net') : $endpoint;
+  $endpoint = empty($endpoint) ? config_get('mailgun.settings', 'api_endpoint') : $endpoint;
+  if (empty($endpoint)) {
+    watchdog('mailgun', 'Mailgun client initialization failed: Missing API endpoint.', array(), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
   return Mailgun::create($key, $endpoint);
 }
 
@@ -207,13 +155,7 @@ function mailgun_get_client($key = '', $endpoint = '') {
  *   TRUE if library is installed, FALSE otherwise.
  */
 function mailgun_check_library() {
-  if (module_exists('libraries')) {
-    libraries_load('mailgun');
-  }
-  if (method_exists('\Mailgun\Mailgun', 'create')) {
-    return TRUE;
-  }
-  return FALSE;
+  return class_exists('\Mailgun\Mailgun');
 }
 
 /**
@@ -223,7 +165,8 @@ function mailgun_check_library() {
  *   TRUE if api settings are configured, FALSE otherwise.
  */
 function mailgun_check_api_settings() {
-  return !empty(variable_get('mailgun_api_key', '')) && !empty(variable_get('mailgun_domain', ''));
+  $config = config('mailgun.settings');
+  return !empty($config->get('api_key')) && !empty($config->get('domain'));
 }
 
 /**
@@ -252,7 +195,7 @@ function template_preprocess_mailgun_message(&$variables) {
  *   - to: The e-mail addressthe message will be sent to.
  *   - subject: The subject of the message.
  *   - text: The plain-text version of the message. Processed using
- *    drupal_html_to_text().
+ *    backdrop_html_to_text().
  *   - html: The original message content. May contain HTML tags.
  *   - cc: One or more carbon copy recipients. If multiple, separate with
  *    commas.
@@ -293,9 +236,10 @@ function mailgun_send(array $mailgun_message) {
   if (!$client) {
     return FALSE;
   }
+  $config = config('mailgun.settings');
 
   // Test mode. Mailgun will accept the message but will not send it.
-  if (variable_get('mailgun_test', FALSE)) {
+  if ($config->get('test_mode')) {
     $mailgun_message['o:testmode'] = 'yes';
   }
 
@@ -303,7 +247,7 @@ function mailgun_send(array $mailgun_message) {
   $mailgun_message += $mailgun_message['params'];
   unset($mailgun_message['params']);
 
-  if (variable_get('mailgun_domain', '_sender') === '_sender') {
+  if ($config->get('domain', '_sender') === '_sender') {
     // Extract the domain from the sender's email address.
     // Use regular expression to check since it could be either a plain email
     // address or in the form "Name <example@example.com>".
@@ -368,7 +312,7 @@ function mailgun_send(array $mailgun_message) {
     }
   }
   else {
-    $working_domain = variable_get('mailgun_domain', '');
+    $working_domain = $config->get('domain');
   }
 
   // Send message with attachments.
@@ -386,7 +330,7 @@ function mailgun_send(array $mailgun_message) {
     $result = $client->messages()->send($working_domain, $mailgun_message);
 
     if (!empty($result)) {
-      if (variable_get('mailgun_log', FALSE)) {
+      if ($config->get('log_emails')) {
         watchdog('mailgun', 'Successfully sent message from %from to %to. %message.', array(
           '%from' => $mailgun_message['from'],
           '%to' => $mailgun_message['to'],

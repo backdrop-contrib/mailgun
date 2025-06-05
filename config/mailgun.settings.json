@@ -1,0 +1,15 @@
+{
+  "_config_name": "mailgun.settings",
+  "api_key": "",
+  "domain": "_sender",
+  "api_endpoint": "https://api.mailgun.net",
+  "test_mode": 0,
+  "log_emails": 0,
+  "tracking": "default",
+  "tracking_clicks": "default",
+  "tracking_opens": "default",
+  "format": "_none",
+  "queue": 0,
+  "queue_threshold": 0,
+  "tagging_mailkey": 1
+}

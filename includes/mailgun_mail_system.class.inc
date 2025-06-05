@@ -1,12 +1,11 @@
 <?php
-
 /**
  * @file
- * Implements Mailgun as a Drupal MailSystemInterface.
+ * Implements Mailgun as a Backdrop MailSystemInterface.
  */
 
 /**
- * Modify the Drupal mail system to use Mailgun when sending e-mails.
+ * Modify the Backdrop mail system to use Mailgun when sending e-mails.
  */
 class MailgunMailSystem implements MailSystemInterface {
 
@@ -26,7 +25,7 @@ class MailgunMailSystem implements MailSystemInterface {
     }
 
     // Run the message through text format if specified in Mailgun settings.
-    $format = variable_get('mailgun_format', '_none');
+    $format = config_get('mailgun.settings', 'format');
     if ($format !== '_none') {
       $message['body'] = check_markup($message['body'], $format);
     }
@@ -51,7 +50,7 @@ class MailgunMailSystem implements MailSystemInterface {
    * @return bool
    *   TRUE if the mail was successfully accepted or queued, FALSE otherwise.
    *
-   * @see drupal_mail()
+   * @see backdrop_mail()
    * @see https://documentation.mailgun.com/api-sending.html#sending
    */
   public function mail(array $message) {
@@ -62,6 +61,7 @@ class MailgunMailSystem implements MailSystemInterface {
     if (!function_exists('mailsystem_html_to_text')) {
       module_load_include('inc', 'mailsystem', 'html_to_text');
     }
+    $config = config('mailgun.settings');
     // Build the Mailgun message array.
     $mailgun_message = array(
       'from' => $message['from'],
@@ -87,14 +87,15 @@ class MailgunMailSystem implements MailSystemInterface {
     $params = array();
 
     // Populate default tracking settings.
+    $config = config('mailgun.settings');
     $tracking_settings = array(
-      'mailgun_tracking' => 'o:tracking',
-      'mailgun_tracking_clicks' => 'o:tracking-clicks',
-      'mailgun_tracking_opens' => 'o:tracking-opens',
+      'tracking' => 'o:tracking',
+      'tracking_clicks' => 'o:tracking-clicks',
+      'tracking_opens' => 'o:tracking-opens',
     );
-    foreach ($tracking_settings as $mailgun_variable => $mailgun_parameter) {
-      if (($variable_value = variable_get($mailgun_variable, 'default')) !== 'default') {
-        $params[$mailgun_parameter] = $variable_value === 'enabled' ? 'yes' : 'no';
+    foreach ($tracking_settings as $mailgun_setting => $mailgun_parameter) {
+      if (($setting_value = $config->get($mailgun_setting)) !== 'default') {
+        $params[$mailgun_parameter] = $setting_value === 'enabled' ? 'yes' : 'no';
       }
     }
 
@@ -134,7 +135,7 @@ class MailgunMailSystem implements MailSystemInterface {
     }
 
     // Add default tags by mail key if enabled.
-    if (variable_get('mailgun_tagging_mailkey', TRUE)) {
+    if ($config->get('tagging_mailkey')) {
       $params['o:tag'][] = $message['id'];
     }
 
@@ -179,8 +180,8 @@ class MailgunMailSystem implements MailSystemInterface {
     // once exceeds the threshold. Threshold is tested only for
     // views_bulk_operations module. If the threshold is larger than zero only
     // views_bulk_operations emails are queued.
-    if (variable_get('mailgun_queue', FALSE)) {
-      $queue_threshold = variable_get(MAILGUN_QUEUE_THRESHOLD, 0);
+    if ($config->get('queue', FALSE)) {
+      $queue_threshold = $config->get('queue_threshold');
       $queue_threshold_exceeded = FALSE;
       if ($queue_threshold == 0) {
         $queue_threshold_exceeded = TRUE;
@@ -190,7 +191,7 @@ class MailgunMailSystem implements MailSystemInterface {
       }
 
       if ($queue_threshold_exceeded) {
-        $queue = DrupalQueue::get('mailgun_queue', TRUE);
+        $queue = BackdropQueue::get('mailgun_queue', TRUE);
         $queue->createItem($mailgun_message);
         return TRUE;
       }
