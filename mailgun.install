@@ -57,9 +57,9 @@ function mailgun_requirements($phase) {
  * Convert variables to configuration.
  */
 function mailgun_update_1000() {
+  state_set('mailgun.api_key', update_variable_get('mailgun_api_key', ''));
   $config = config('mailgun.settings');
-  $config->set('api_key', update_variable_get('mailgun_api_key', ''))
-    ->set('domain', update_variable_get('mailgun_domain', '_sender'))
+  $config->set('domain', update_variable_get('mailgun_domain', '_sender'))
     ->set('api_endpoint', update_variable_get('mailgun_api_endpoint', 'https://api.mailgun.net'))
     ->set('test_mode', update_variable_get('mailgun_test', FALSE))
     ->set('log_emails', update_variable_get('mailgun_log', FALSE))
