@@ -133,7 +133,7 @@ function mailgun_get_client($key = '', $endpoint = '') {
     return FALSE;
   }
 
-  $key = (empty($key)) ? config_get('mailgun.settings', 'api_key') : $key;
+  $key = (empty($key)) ? _mailgun_get_api_key() : $key;
   if (empty($key)) {
     watchdog('mailgun', 'Mailgun client initialization failed: Missing API key.', array(), WATCHDOG_ERROR);
     return FALSE;
@@ -166,7 +166,7 @@ function mailgun_check_library() {
  */
 function mailgun_check_api_settings() {
   $config = config('mailgun.settings');
-  return !empty($config->get('api_key')) && !empty($config->get('domain'));
+  return !empty(_mailgun_get_api_key()) && !empty($config->get('domain'));
 }
 
 /**
@@ -357,4 +357,11 @@ function mailgun_send(array $mailgun_message) {
     ));
     return FALSE;
   }
+}
+
+/**
+ * Internal helper to return the Mailgun API key.
+ */
+function _mailgun_get_api_key() {
+  return state_get('mailgun.api_key', '');
 }

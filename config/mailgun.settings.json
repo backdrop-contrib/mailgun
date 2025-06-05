@@ -1,6 +1,5 @@
 {
   "_config_name": "mailgun.settings",
-  "api_key": "",
   "domain": "_sender",
   "api_endpoint": "https://api.mailgun.net",
   "test_mode": 0,

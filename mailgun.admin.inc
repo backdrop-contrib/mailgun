@@ -24,17 +24,24 @@ function mailgun_admin_settings(array $form, array &$form_state) {
   }
 
   $config = config('mailgun.settings');
-  $key = $config->get('api_key');
+  $key = _mailgun_get_api_key();
+  if (!empty($key)) {
+    $key_description = t('<strong>The API key is currently set</strong>, though not shown here for security reasons. You can change it if you wish.');
+  }
+  else {
+    $key_description = t('<strong>The API key is not set</strong>. Please enter it here.');
+  }
+  $key_description .= ' ' . t('You can get a secret API key from the !link.', array(
+    '!link' => l(t('Mailgun dashboard'), 'https://app.mailgun.com/app/dashboard'),
+  ));
 
   $form['#config'] = 'mailgun.settings';
   $form['api_key'] = array(
     '#title' => t('Mailgun API key'),
-    '#type' => 'textfield',
-    '#description' => t('Get your Secret API key from the !link.', array(
-      '!link' => l(t('Mailgun dashboard'), 'https://app.mailgun.com/app/dashboard'),
-    )),
-    '#default_value' => $key,
-    '#required' => TRUE,
+    '#type' => 'password',
+    '#description' => $key_description,
+    '#default_value' => '',
+    '#required' => empty($key),
   );
 
   $client = FALSE;
@@ -74,7 +81,7 @@ function mailgun_admin_settings(array $form, array &$form_state) {
       '#title' => t('Domain'),
       '#type' => 'select',
       '#options' => $domain_options,
-      '#description' => t('Mails will be sent using this domain.'),
+      '#description' => t('Email will be sent using this domain.'),
       '#default_value' => $config->get('domain'),
       '#prefix' => '<div id="mailgun-domains-wrapper">',
       '#suffix' => '</div>',
@@ -193,6 +200,7 @@ function mailgun_admin_settings(array $form, array &$form_state) {
 
   $form = system_settings_form($form);
   $form['#validate'][] = 'mailgun_admin_settings_validate';
+  $form['#submit'][] = 'mailgun_admin_settings_submit';
 
   return $form;
 }
@@ -210,7 +218,8 @@ function mailgun_admin_domains_callback($form, $form_state) {
  * Perform additional validation to ensure the API key entered is valid.
  */
 function mailgun_admin_settings_validate($form, &$form_state) {
-  if ($form['api_key']['#default_value'] != $form_state['values']['api_key']) {
+  $api_key = _mailgun_get_api_key();
+  if ($api_key != $form_state['values']['api_key'] && !empty($form_state['values']['api_key'])) {
     // The API key has changed. Perform validation.
     $form_state['values']['api_key'] = trim($form_state['values']['api_key']);
     $client = mailgun_get_client($form_state['values']['api_key']);
@@ -231,6 +240,18 @@ function mailgun_admin_settings_validate($form, &$form_state) {
       )));
     }
   }
+}
+
+/**
+ * Form submission handler for mailgun_admin_settings().
+ *
+ * Perform additional submission processing to store API key outside of config.
+ */
+function mailgun_admin_settings_submit($form, &$form_state) {
+  if (!empty($form_state['values']['api_key'])) {
+    state_set('mailgun.api_key', $form_state['values']['api_key']);
+  }
+  unset($form_state['values']['api_key']);
 }
 
 /**
