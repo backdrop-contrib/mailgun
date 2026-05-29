@@ -37,6 +37,7 @@ Bugs and Feature requests should be reported in the
 ## Current Maintainers
 
  - [Laryn Kragt Bakker](https://github.com/laryn)
+ - [Eric Wheeler](https://github.com/sikofitt)
  - Co-maintainers wanted
 
 ## Credits
